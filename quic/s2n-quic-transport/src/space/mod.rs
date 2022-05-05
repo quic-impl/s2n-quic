@@ -22,14 +22,15 @@ use s2n_quic_core::{
     event::{self, IntoEvent},
     frame::{
         ack::AckRanges, crypto::CryptoRef, datagram::DatagramRef, stream::StreamRef, Ack,
-        ConnectionClose, DataBlocked, HandshakeDone, MaxData, MaxStreamData, MaxStreams,
-        NewConnectionId, NewToken, PathChallenge, PathResponse, ResetStream, RetireConnectionId,
-        StopSending, StreamDataBlocked, StreamsBlocked,
+        ConnectionClose, DataBlocked, Frame, FrameMut, HandshakeDone, MaxData, MaxStreamData,
+        MaxStreams, NewConnectionId, NewToken, PathChallenge, PathResponse, ResetStream,
+        RetireConnectionId, StopSending, StreamDataBlocked, StreamsBlocked,
     },
     inet::DatagramInfo,
     packet::number::{PacketNumber, PacketNumberSpace},
     time::{timer, Timestamp},
     transport,
+    varint::VarInt,
 };
 
 mod application;
@@ -448,7 +449,6 @@ impl<Config: endpoint::Config> PacketSpaceManager<Config> {
     pub fn on_pending_ack_ranges<Pub: event::ConnectionPublisher>(
         &mut self,
         timestamp: Timestamp,
-        path_id: path::Id,
         path_manager: &mut path::Manager<Config>,
         local_id_registry: &mut connection::LocalIdRegistry,
         publisher: &mut Pub,
@@ -456,22 +456,24 @@ impl<Config: endpoint::Config> PacketSpaceManager<Config> {
         debug_assert!(
             self.application().is_some(),
             "application space should exists since delay ACK processing is only enabled\
-            post handshake complete and connection indicated ACK interest"
+            post handshake complete and the Connection indicated interest"
         );
         debug_assert!(
             !self.application().unwrap().pending_ack_ranges.is_empty(),
-            "pending_ack_ranges should be non-empty since connection indicated ACK interest"
+            "pending_ack_ranges should be non-empty since Connection indicated interest"
         );
 
         if let Some((space, handshake_status)) = self.application_mut() {
             space.on_pending_ack_ranges(
                 timestamp,
-                path_id,
                 path_manager,
                 handshake_status,
                 local_id_registry,
                 publisher,
             )?;
+
+            // reset all information associated with the current round
+            space.pending_ack_ranges.reset();
         }
 
         Ok(())
@@ -483,6 +485,10 @@ impl<Config: endpoint::Config> ack::interest::Provider for PacketSpaceManager<Co
     fn ack_interest<Q: ack::interest::Query>(&self, query: &mut Q) -> ack::interest::Result {
         if let Some(space) = self.application() {
             if !space.pending_ack_ranges.is_empty() {
+                debug_assert!(
+                    space.pending_ack_ranges.current_active_path.is_some(),
+                    "active path should be set prior to processing acks"
+                );
                 return query.on_interest(ack::interest::Interest::Immediate);
             }
         }
@@ -699,11 +705,6 @@ pub trait PacketSpace<Config: endpoint::Config> {
         publisher: &mut Pub,
         packet_interceptor: &mut Config::PacketInterceptor,
     ) -> Result<ProcessedPacket<'a>, connection::Error> {
-        use s2n_quic_core::{
-            frame::{Frame, FrameMut},
-            varint::VarInt,
-        };
-
         let mut payload = {
             use s2n_quic_core::packet::interceptor::{Interceptor, Packet};
 
