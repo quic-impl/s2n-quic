@@ -6,7 +6,7 @@ plan:
 	terraform plan -out=plan
 
 apply:
-	terraform apply plan
+	terraform init && terraform apply
 
 destroy:
 	terraform destroy
