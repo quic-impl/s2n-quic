@@ -20,9 +20,17 @@ pub(crate) async fn handle_connection(mut connection: Connection, www_dir: Arc<P
     loop {
         match connection.accept_bidirectional_stream().await {
             Ok(Some(stream)) => {
-                let _ = connection.query_event_context_mut(|context: &mut MyConnectionContext| {
-                    context.stream_requests += 1
-                });
+                cfg_if::cfg_if! {
+                    if #[cfg(not(all(
+                        s2n_quic_unstable,
+                        unstable_provider_event_bpf
+                    )))] {
+                        let _ = connection.query_event_context_mut(|context: &mut MyConnectionContext|
+                        {
+                            context.stream_requests += 1
+                        });
+                    }
+                };
 
                 let www_dir = www_dir.clone();
                 // spawn a task per stream
@@ -33,19 +41,33 @@ pub(crate) async fn handle_connection(mut connection: Connection, www_dir: Arc<P
                 });
             }
             Ok(None) => {
-                // the connection was closed without an error
-                let context = connection
-                    .query_event_context(|context: &MyConnectionContext| *context)
-                    .expect("query should execute");
-                debug!("Final stats: {:?}", context);
+                cfg_if::cfg_if! {
+                    if #[cfg(not(all(
+                        s2n_quic_unstable,
+                        unstable_provider_event_bpf
+                    )))] {
+                        // the connection was closed without an error
+                        let context = connection
+                            .query_event_context(|context: &MyConnectionContext| *context)
+                            .expect("query should execute");
+                        debug!("Final stats: {:?}", context);
+                    }
+                };
                 return;
             }
             Err(err) => {
                 eprintln!("error while accepting stream: {}", err);
-                let context = connection
-                    .query_event_context(|context: &MyConnectionContext| *context)
-                    .expect("query should execute");
-                debug!("Final stats: {:?}", context);
+                cfg_if::cfg_if! {
+                    if #[cfg(not(all(
+                        s2n_quic_unstable,
+                        unstable_provider_event_bpf
+                    )))] {
+                        let context = connection
+                            .query_event_context(|context: &MyConnectionContext| *context)
+                            .expect("query should execute");
+                        debug!("Final stats: {:?}", context);
+                    }
+                };
                 return;
             }
         }
