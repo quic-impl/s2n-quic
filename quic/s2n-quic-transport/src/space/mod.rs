@@ -463,6 +463,7 @@ impl<Config: endpoint::Config> PacketSpaceManager<Config> {
             "pending_ack_ranges should be non-empty since Connection indicated interest"
         );
 
+        println!("2---------");
         if let Some((space, handshake_status)) = self.application_mut() {
             space.on_pending_ack_ranges(
                 timestamp,
@@ -484,11 +485,16 @@ impl<Config: endpoint::Config> ack::interest::Provider for PacketSpaceManager<Co
     #[inline]
     fn ack_interest<Q: ack::interest::Query>(&self, query: &mut Q) -> ack::interest::Result {
         if let Some(space) = self.application() {
-            if !space.pending_ack_ranges.is_empty() {
+            println!(
+                "ack_interest? {}---------",
+                space.pending_ack_ranges.ack_interest
+            );
+            if space.pending_ack_ranges.ack_interest && !space.pending_ack_ranges.is_empty() {
                 debug_assert!(
                     space.pending_ack_ranges.current_active_path.is_some(),
                     "active path should be set prior to processing acks"
                 );
+
                 return query.on_interest(ack::interest::Interest::Immediate);
             }
         }

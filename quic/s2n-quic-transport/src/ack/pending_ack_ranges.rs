@@ -16,6 +16,7 @@ pub struct PendingAckRanges {
     ack_delay: Duration,
     /// The path for which to aggregate ACKs
     pub current_active_path: Option<path::Id>,
+    pub ack_interest: bool,
 }
 
 impl PendingAckRanges {
@@ -163,6 +164,7 @@ mod tests {
             ecn_counts,
             ack_delay,
             current_active_path: None,
+            ack_interest: false,
         }
     }
 
