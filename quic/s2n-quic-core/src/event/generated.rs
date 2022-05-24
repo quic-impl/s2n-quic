@@ -1961,16 +1961,6 @@ pub mod bpf {
             probe!(s2n_quic, on_congestion, id);
         }
         #[inline]
-        fn on_ack_processed(
-            &mut self,
-            _context: &mut Self::ConnectionContext,
-            meta: &api::ConnectionMeta,
-            _event: &api::AckProcessed,
-        ) {
-            let id = meta.id;
-            probe!(s2n_quic, on_ack_processed, id);
-        }
-        #[inline]
         fn on_packet_dropped(
             &mut self,
             _context: &mut Self::ConnectionContext,
