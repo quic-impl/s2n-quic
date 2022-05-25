@@ -139,9 +139,12 @@ impl Interop {
 
         let io = io_builder.build()?;
 
+        let subscriber = crate::perf::Subscriber::default();
+        subscriber.spawn(core::time::Duration::from_secs(1));
+
         let client = Client::builder()
             .with_io(io)?
-            .with_event(event::tracing::Provider::default())?;
+            .with_event((subscriber, event::tracing::Subscriber::default()))?;
         let client = match self.tls {
             #[cfg(unix)]
             TlsProviders::S2N => {
