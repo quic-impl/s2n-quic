@@ -98,6 +98,7 @@ struct RecoveryMetrics<'a> {
 
 #[event("recovery:congestion")]
 /// Congestion (ECN or packet loss) has occurred
+#[bpf]
 struct Congestion<'a> {
     path: Path<'a>,
     source: CongestionSource,
@@ -108,6 +109,24 @@ struct Congestion<'a> {
 struct AckProcessed<'a> {
     action: AckAction,
     path: Path<'a>,
+}
+
+#[event("recovery:process_pending_ack")]
+#[bpf]
+/// Processing pending ACKs
+struct ProcessPendingAck {
+    smoothed_rtt: Duration,
+    ack_delay: Duration,
+}
+
+#[event("recovery:ack_interest")]
+#[bpf]
+/// ACK interest and delay info
+struct AckInterest {
+    // path: Path<'a>,
+    has_interest: bool,
+    expired: bool,
+    // processing: bool,
 }
 
 #[event("transport:packet_dropped")]

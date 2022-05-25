@@ -1056,7 +1056,6 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     ) -> Result<(), connection::Error> {
         let mut publisher = self.event_context.publisher(timestamp, subscriber);
 
-        println!("1---------");
         self.space_manager
             .on_pending_ack_ranges(
                 timestamp,

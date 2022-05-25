@@ -559,6 +559,26 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
+    #[doc = " Processing pending ACKs"]
+    pub struct ProcessPendingAck {
+        pub smoothed_rtt: Duration,
+        pub ack_delay: Duration,
+    }
+    impl Event for ProcessPendingAck {
+        const NAME: &'static str = "recovery:process_pending_ack";
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
+    #[doc = " ACK interest and delay info"]
+    pub struct AckInterest {
+        pub has_interest: bool,
+        pub expired: bool,
+    }
+    impl Event for AckInterest {
+        const NAME: &'static str = "recovery:ack_interest";
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
     #[doc = " Packet was dropped with the given reason"]
     pub struct PacketDropped<'a> {
         pub reason: PacketDropReason<'a>,
@@ -1471,6 +1491,34 @@ pub mod tracing {
             tracing :: event ! (target : "ack_processed" , parent : id , tracing :: Level :: DEBUG , action = tracing :: field :: debug (action) , path = tracing :: field :: debug (path));
         }
         #[inline]
+        fn on_process_pending_ack(
+            &mut self,
+            context: &mut Self::ConnectionContext,
+            _meta: &api::ConnectionMeta,
+            event: &api::ProcessPendingAck,
+        ) {
+            let id = context.id();
+            let api::ProcessPendingAck {
+                smoothed_rtt,
+                ack_delay,
+            } = event;
+            tracing :: event ! (target : "process_pending_ack" , parent : id , tracing :: Level :: DEBUG , smoothed_rtt = tracing :: field :: debug (smoothed_rtt) , ack_delay = tracing :: field :: debug (ack_delay));
+        }
+        #[inline]
+        fn on_ack_interest(
+            &mut self,
+            context: &mut Self::ConnectionContext,
+            _meta: &api::ConnectionMeta,
+            event: &api::AckInterest,
+        ) {
+            let id = context.id();
+            let api::AckInterest {
+                has_interest,
+                expired,
+            } = event;
+            tracing :: event ! (target : "ack_interest" , parent : id , tracing :: Level :: DEBUG , has_interest = tracing :: field :: debug (has_interest) , expired = tracing :: field :: debug (expired));
+        }
+        #[inline]
         fn on_packet_dropped(
             &mut self,
             context: &mut Self::ConnectionContext,
@@ -1997,10 +2045,46 @@ pub mod bpf {
             &mut self,
             _context: &mut Self::ConnectionContext,
             meta: &api::ConnectionMeta,
-            _event: &api::Congestion,
+            event: &api::Congestion,
         ) {
             let id = meta.id;
-            probe!(s2n_quic, on_congestion, id);
+            let m = event.as_bpf();
+            let ptr = &m as *const generated_bpf::Congestion;
+            probe!(s2n_quic, on_congestion, id, ptr);
+        }
+        #[inline]
+        fn on_ack_processed(
+            &mut self,
+            _context: &mut Self::ConnectionContext,
+            meta: &api::ConnectionMeta,
+            _event: &api::AckProcessed,
+        ) {
+            let id = meta.id;
+            probe!(s2n_quic, on_ack_processed, id);
+        }
+        #[inline]
+        fn on_process_pending_ack(
+            &mut self,
+            _context: &mut Self::ConnectionContext,
+            meta: &api::ConnectionMeta,
+            event: &api::ProcessPendingAck,
+        ) {
+            let id = meta.id;
+            let m = event.as_bpf();
+            let ptr = &m as *const generated_bpf::ProcessPendingAck;
+            probe!(s2n_quic, on_process_pending_ack, id, ptr);
+        }
+        #[inline]
+        fn on_ack_interest(
+            &mut self,
+            _context: &mut Self::ConnectionContext,
+            meta: &api::ConnectionMeta,
+            event: &api::AckInterest,
+        ) {
+            let id = meta.id;
+            let m = event.as_bpf();
+            let ptr = &m as *const generated_bpf::AckInterest;
+            probe!(s2n_quic, on_ack_interest, id, ptr);
         }
         #[inline]
         fn on_packet_dropped(
@@ -3302,6 +3386,44 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
+    #[doc = " Processing pending ACKs"]
+    pub struct ProcessPendingAck {
+        pub smoothed_rtt: Duration,
+        pub ack_delay: Duration,
+    }
+    impl IntoEvent<api::ProcessPendingAck> for ProcessPendingAck {
+        #[inline]
+        fn into_event(self) -> api::ProcessPendingAck {
+            let ProcessPendingAck {
+                smoothed_rtt,
+                ack_delay,
+            } = self;
+            api::ProcessPendingAck {
+                smoothed_rtt: smoothed_rtt.into_event(),
+                ack_delay: ack_delay.into_event(),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    #[doc = " ACK interest and delay info"]
+    pub struct AckInterest {
+        pub has_interest: bool,
+        pub expired: bool,
+    }
+    impl IntoEvent<api::AckInterest> for AckInterest {
+        #[inline]
+        fn into_event(self) -> api::AckInterest {
+            let AckInterest {
+                has_interest,
+                expired,
+            } = self;
+            api::AckInterest {
+                has_interest: has_interest.into_event(),
+                expired: expired.into_event(),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
     #[doc = " Packet was dropped with the given reason"]
     pub struct PacketDropped<'a> {
         pub reason: PacketDropReason<'a>,
@@ -4183,6 +4305,30 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
+        #[doc = "Called when the `ProcessPendingAck` event is triggered"]
+        #[inline]
+        fn on_process_pending_ack(
+            &mut self,
+            context: &mut Self::ConnectionContext,
+            meta: &ConnectionMeta,
+            event: &ProcessPendingAck,
+        ) {
+            let _ = context;
+            let _ = meta;
+            let _ = event;
+        }
+        #[doc = "Called when the `AckInterest` event is triggered"]
+        #[inline]
+        fn on_ack_interest(
+            &mut self,
+            context: &mut Self::ConnectionContext,
+            meta: &ConnectionMeta,
+            event: &AckInterest,
+        ) {
+            let _ = context;
+            let _ = meta;
+            let _ = event;
+        }
         #[doc = "Called when the `PacketDropped` event is triggered"]
         #[inline]
         fn on_packet_dropped(
@@ -4744,6 +4890,26 @@ mod traits {
             (self.1).on_ack_processed(&mut context.1, meta, event);
         }
         #[inline]
+        fn on_process_pending_ack(
+            &mut self,
+            context: &mut Self::ConnectionContext,
+            meta: &ConnectionMeta,
+            event: &ProcessPendingAck,
+        ) {
+            (self.0).on_process_pending_ack(&mut context.0, meta, event);
+            (self.1).on_process_pending_ack(&mut context.1, meta, event);
+        }
+        #[inline]
+        fn on_ack_interest(
+            &mut self,
+            context: &mut Self::ConnectionContext,
+            meta: &ConnectionMeta,
+            event: &AckInterest,
+        ) {
+            (self.0).on_ack_interest(&mut context.0, meta, event);
+            (self.1).on_ack_interest(&mut context.1, meta, event);
+        }
+        #[inline]
         fn on_packet_dropped(
             &mut self,
             context: &mut Self::ConnectionContext,
@@ -5250,6 +5416,10 @@ mod traits {
         fn on_congestion(&mut self, event: builder::Congestion);
         #[doc = "Publishes a `AckProcessed` event to the publisher's subscriber"]
         fn on_ack_processed(&mut self, event: builder::AckProcessed);
+        #[doc = "Publishes a `ProcessPendingAck` event to the publisher's subscriber"]
+        fn on_process_pending_ack(&mut self, event: builder::ProcessPendingAck);
+        #[doc = "Publishes a `AckInterest` event to the publisher's subscriber"]
+        fn on_ack_interest(&mut self, event: builder::AckInterest);
         #[doc = "Publishes a `PacketDropped` event to the publisher's subscriber"]
         fn on_packet_dropped(&mut self, event: builder::PacketDropped);
         #[doc = "Publishes a `KeyUpdate` event to the publisher's subscriber"]
@@ -5433,6 +5603,24 @@ mod traits {
             let event = event.into_event();
             self.subscriber
                 .on_ack_processed(self.context, &self.meta, &event);
+            self.subscriber
+                .on_connection_event(self.context, &self.meta, &event);
+            self.subscriber.on_event(&self.meta, &event);
+        }
+        #[inline]
+        fn on_process_pending_ack(&mut self, event: builder::ProcessPendingAck) {
+            let event = event.into_event();
+            self.subscriber
+                .on_process_pending_ack(self.context, &self.meta, &event);
+            self.subscriber
+                .on_connection_event(self.context, &self.meta, &event);
+            self.subscriber.on_event(&self.meta, &event);
+        }
+        #[inline]
+        fn on_ack_interest(&mut self, event: builder::AckInterest) {
+            let event = event.into_event();
+            self.subscriber
+                .on_ack_interest(self.context, &self.meta, &event);
             self.subscriber
                 .on_connection_event(self.context, &self.meta, &event);
             self.subscriber.on_event(&self.meta, &event);
@@ -5649,6 +5837,8 @@ pub mod testing {
         pub recovery_metrics: u32,
         pub congestion: u32,
         pub ack_processed: u32,
+        pub process_pending_ack: u32,
+        pub ack_interest: u32,
         pub packet_dropped: u32,
         pub key_update: u32,
         pub key_space_discarded: u32,
@@ -5718,6 +5908,8 @@ pub mod testing {
                 recovery_metrics: 0,
                 congestion: 0,
                 ack_processed: 0,
+                process_pending_ack: 0,
+                ack_interest: 0,
                 packet_dropped: 0,
                 key_update: 0,
                 key_space_discarded: 0,
@@ -5890,6 +6082,28 @@ pub mod testing {
             event: &api::AckProcessed,
         ) {
             self.ack_processed += 1;
+            if self.location.is_some() {
+                self.output.push(format!("{:?} {:?}", meta, event));
+            }
+        }
+        fn on_process_pending_ack(
+            &mut self,
+            _context: &mut Self::ConnectionContext,
+            meta: &api::ConnectionMeta,
+            event: &api::ProcessPendingAck,
+        ) {
+            self.process_pending_ack += 1;
+            if self.location.is_some() {
+                self.output.push(format!("{:?} {:?}", meta, event));
+            }
+        }
+        fn on_ack_interest(
+            &mut self,
+            _context: &mut Self::ConnectionContext,
+            meta: &api::ConnectionMeta,
+            event: &api::AckInterest,
+        ) {
+            self.ack_interest += 1;
             if self.location.is_some() {
                 self.output.push(format!("{:?} {:?}", meta, event));
             }
@@ -6219,6 +6433,8 @@ pub mod testing {
         pub recovery_metrics: u32,
         pub congestion: u32,
         pub ack_processed: u32,
+        pub process_pending_ack: u32,
+        pub ack_interest: u32,
         pub packet_dropped: u32,
         pub key_update: u32,
         pub key_space_discarded: u32,
@@ -6278,6 +6494,8 @@ pub mod testing {
                 recovery_metrics: 0,
                 congestion: 0,
                 ack_processed: 0,
+                process_pending_ack: 0,
+                ack_interest: 0,
                 packet_dropped: 0,
                 key_update: 0,
                 key_space_discarded: 0,
@@ -6470,6 +6688,20 @@ pub mod testing {
         }
         fn on_ack_processed(&mut self, event: builder::AckProcessed) {
             self.ack_processed += 1;
+            let event = event.into_event();
+            if self.location.is_some() {
+                self.output.push(format!("{:?}", event));
+            }
+        }
+        fn on_process_pending_ack(&mut self, event: builder::ProcessPendingAck) {
+            self.process_pending_ack += 1;
+            let event = event.into_event();
+            if self.location.is_some() {
+                self.output.push(format!("{:?}", event));
+            }
+        }
+        fn on_ack_interest(&mut self, event: builder::AckInterest) {
+            self.ack_interest += 1;
             let event = event.into_event();
             if self.location.is_some() {
                 self.output.push(format!("{:?}", event));

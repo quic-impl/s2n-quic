@@ -21,6 +21,18 @@ struct RecoveryMetrics {
   uint64_t congestion_window;
   uint64_t bytes_in_flight;
 };
+struct Congestion {
+  uint64_t path;
+  uint64_t source;
+};
+struct ProcessPendingAck {
+  uint64_t smoothed_rtt;
+  uint64_t ack_delay;
+};
+struct AckInterest {
+  uint64_t has_interest;
+  uint64_t expired;
+};
 struct RxStreamProgress {
   uint64_t bytes;
 };

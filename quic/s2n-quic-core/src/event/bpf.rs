@@ -28,6 +28,15 @@ macro_rules! ident_into_bpf {
 
 ident_into_bpf!(u8, u16, u32, u64, usize);
 
+impl IntoBpf<u64> for bool {
+    fn as_bpf(&self) -> u64 {
+        match self {
+            true => 1,
+            false => 0,
+        }
+    }
+}
+
 impl IntoBpf<u64> for Duration {
     fn as_bpf(&self) -> u64 {
         self.as_nanos() as u64
@@ -37,5 +46,23 @@ impl IntoBpf<u64> for Duration {
 impl IntoBpf<u64> for api::Path<'_> {
     fn as_bpf(&self) -> u64 {
         self.id
+    }
+}
+
+// impl IntoBpf<u64> for api::Congestion<'_> {
+//     fn as_bpf(&self) -> u64 {
+//         match self.source {
+//             api::CongestionSource::PacketLoss { .. } => 1,
+//             api::CongestionSource::Ecn { .. } => 0,
+//         }
+//     }
+// }
+
+impl IntoBpf<u64> for api::CongestionSource {
+    fn as_bpf(&self) -> u64 {
+        match self {
+            api::CongestionSource::PacketLoss { .. } => 1,
+            api::CongestionSource::Ecn { .. } => 0,
+        }
     }
 }

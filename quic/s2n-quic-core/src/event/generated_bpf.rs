@@ -37,6 +37,51 @@ impl<'a> IntoBpf<RecoveryMetrics> for api::RecoveryMetrics<'a> {
 }
 #[repr(C)]
 #[derive(Debug)]
+pub(super) struct Congestion {
+    pub path: u64,
+    pub source: u64,
+}
+impl<'a> IntoBpf<Congestion> for api::Congestion<'a> {
+    #[inline]
+    fn as_bpf(&self) -> Congestion {
+        Congestion {
+            path: self.path.as_bpf(),
+            source: self.source.as_bpf(),
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug)]
+pub(super) struct ProcessPendingAck {
+    pub smoothed_rtt: u64,
+    pub ack_delay: u64,
+}
+impl IntoBpf<ProcessPendingAck> for api::ProcessPendingAck {
+    #[inline]
+    fn as_bpf(&self) -> ProcessPendingAck {
+        ProcessPendingAck {
+            smoothed_rtt: self.smoothed_rtt.as_bpf(),
+            ack_delay: self.ack_delay.as_bpf(),
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug)]
+pub(super) struct AckInterest {
+    pub has_interest: u64,
+    pub expired: u64,
+}
+impl IntoBpf<AckInterest> for api::AckInterest {
+    #[inline]
+    fn as_bpf(&self) -> AckInterest {
+        AckInterest {
+            has_interest: self.has_interest.as_bpf(),
+            expired: self.expired.as_bpf(),
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug)]
 pub(super) struct RxStreamProgress {
     pub bytes: u64,
 }

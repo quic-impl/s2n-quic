@@ -27,32 +27,60 @@ usdt:./target/debug/s2n-quic-qns:on_recovery_metrics
 {
     $m = (struct RecoveryMetrics *) arg1;
     @rm_cw = hist($m->congestion_window);
-    @rm_srtt[arg0] = hist($m->smoothed_rtt);
+    /* @rm_srtt[arg0] = hist($m->smoothed_rtt); */
 }
 
 usdt:./target/debug/s2n-quic-qns:on_rx_stream_progress
 {
     $m = (struct RxStreamProgress *) arg1;
-    @rxs = hist($m->bytes);
+    /* @rxs = hist($m->bytes); */
 }
 
 usdt:./target/debug/s2n-quic-qns:on_tx_stream_progress
 {
     $m = (struct TxStreamProgress *) arg1;
-    @txs = hist($m->bytes);
+    /* @txs = hist($m->bytes); */
+}
+
+usdt:./target/debug/s2n-quic-qns:on_process_pending_ack
+{
+    $m = (struct ProcessPendingAck *) arg1;
+    /* printf("process pending ack------ smoothed_rtt: %d, ack_delay: %d\n", $m->smoothed_rtt, $m->ack_delay); */
+    @smoothed_rtt = hist($m->smoothed_rtt);
+    @ack_delay = hist($m->ack_delay);
+}
+
+usdt:./target/debug/s2n-quic-qns:on_ack_interest
+{
+    $m = (struct AckInterest *) arg1;
+    /* printf("ack interest ------ has_interest: %d, expired: %d\n", $m->has_interest, $m->expired); */
+    /* @has_interest = hist($m->has_interest); */
+    @expired = hist($m->expired);
+}
+
+usdt:./target/debug/s2n-quic-qns:on_congestion
+{
+    $m = (struct Congestion *) arg1;
+    @packet_loss++;
+    /* printf("----------- packet_loss: %d\n", $m->source); */
 }
 
 /* print statistics about the process once every 1000 ms */
 i:ms:1000 {
-  printf("Total connections: %d\n", @cs);
 
   /* print and clear congestion_window at each interval */
-  print(@rm_cw);
-  clear(@rm_cw);
+  /* print(@rm_cw); */
+  /* clear(@rm_cw); */
 
   /* print the total smoothed_rtt histogram at the end of the process */
   /* print(@rm_srtt); */
   /* clear(@rm_srtt); */
 
-  print("===");
+  printf("Total connections: %d\n", @cs);
+  printf("packet_loss: %d\n", @packet_loss);
+  print(@ack_delay);
+  print(@expired);
+  print(@smoothed_rtt);
+
+  print("=============================");
 }

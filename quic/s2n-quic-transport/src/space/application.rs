@@ -19,7 +19,11 @@ use s2n_codec::EncoderBuffer;
 use s2n_quic_core::{
     crypto::{application::KeySet, limited, tls, CryptoSuite},
     datagram::Endpoint,
-    event::{self, ConnectionPublisher as _, IntoEvent},
+    event::{
+        self,
+        builder::{AckInterest, ProcessPendingAck},
+        ConnectionPublisher as _, IntoEvent,
+    },
     frame::{
         self, ack::AckRanges, crypto::CryptoRef, datagram::DatagramRef, stream::StreamRef, Ack,
         ConnectionClose, DataBlocked, HandshakeDone, MaxData, MaxStreamData, MaxStreams,
@@ -50,6 +54,8 @@ pub struct ApplicationSpace<Config: endpoint::Config> {
     pub spin_bit: SpinBit,
     /// Aggregate ACK info stored for delayed processing
     pub pending_ack_ranges: PendingAckRanges,
+    /// timeout for when to check ack
+    /// TODO: reset when current path changes, check for other edge cases
     pub ack_timeout: Timestamp,
     /// The crypto suite for application data
     /// TODO: What about ZeroRtt?
@@ -579,7 +585,6 @@ impl<Config: endpoint::Config> ApplicationSpace<Config> {
         local_id_registry: &mut connection::LocalIdRegistry,
         publisher: &mut Pub,
     ) -> Result<(), transport::Error> {
-        println!("3---------");
         debug_assert!(
             !self.pending_ack_ranges.is_empty(),
             "pending_ack_ranges should be non-empty since connection indicated ack interest"
@@ -601,11 +606,11 @@ impl<Config: endpoint::Config> ApplicationSpace<Config> {
                 Duration::from_millis(10),
             ),
         );
-        println!(
-            "smoothed_rtt {:?}, ack_delay {:?}---------",
-            path.rtt_estimator.smoothed_rtt(),
-            delay
-        );
+        publisher.on_process_pending_ack(ProcessPendingAck {
+            // path: path_event!(path, current_active_path),
+            smoothed_rtt: path.rtt_estimator.smoothed_rtt(),
+            ack_delay: delay,
+        });
         self.ack_timeout = timestamp + delay;
 
         let (recovery_manager, mut context, pending_ack_ranges) = self.recovery(
@@ -799,9 +804,19 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         path.on_peer_validated();
 
         // time to process acks
-        if self.ack_timeout.has_elapsed(timestamp) {
+        let expired = self.ack_timeout.has_elapsed(timestamp);
+        let _current_active_path = self
+            .pending_ack_ranges
+            .current_active_path
+            .expect("current path should be set at the start of the round");
+        if expired {
             self.pending_ack_ranges.ack_interest = true;
         }
+        publisher.on_ack_interest(AckInterest {
+            // path: path_event!(path, current_active_path),
+            has_interest: self.pending_ack_ranges.ack_interest,
+            expired,
+        });
 
         // TODO enable batch ACK processing
         if true {
