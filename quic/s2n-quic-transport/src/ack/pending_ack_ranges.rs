@@ -12,7 +12,7 @@ use s2n_quic_core::{
 };
 
 /// Stores aggregated ACK info for delayed processing
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct PendingAckRanges {
     ack_ranges: AckRanges,
     ecn_counts: EcnCounts,
@@ -20,6 +20,18 @@ pub struct PendingAckRanges {
     /// The path for which to aggregate ACKs
     pub current_active_path: Option<path::Id>,
     pub ack_interest: bool,
+}
+
+impl Default for PendingAckRanges {
+    fn default() -> Self {
+        Self {
+            ack_ranges: AckRanges::new(100),
+            ecn_counts: Default::default(),
+            ack_delay: Default::default(),
+            current_active_path: Default::default(),
+            ack_interest: Default::default(),
+        }
+    }
 }
 
 impl PendingAckRanges {
