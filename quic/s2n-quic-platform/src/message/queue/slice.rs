@@ -9,6 +9,12 @@ use s2n_quic_core::{
     path::{self, LocalAddress},
 };
 
+thread_local! {
+    static RAND: u8 = {
+        std::env::var("S2N_QUIC_LOSS").ok().map(|v| v.parse().unwrap()).unwrap_or_default()
+    };
+}
+
 /// A view of the currently enqueued messages for a given segment
 #[derive(Debug)]
 pub struct Slice<'a, Message: message::Message, Behavior> {
@@ -206,6 +212,17 @@ impl<'a, Message: message::Message, B> Slice<'a, Message, B> {
                     // set the len to the actual amount written to the payload
                     prev_message.set_payload_len(payload_len + size.min(gso.size));
                 }
+
+                if *prev_message.payload().last().unwrap() < RAND.with(|v| *v) {
+                    unsafe {
+                        prev_message.set_payload_len(payload_len);
+                    }
+                    return Ok(Ok(tx::Outcome {
+                        len: size,
+                        index: gso.index,
+                    }));
+                }
+
                 // increment the number of segments that we've written
                 gso.count += 1;
 
@@ -321,6 +338,15 @@ impl<
             .ok_or(tx::Error::AtCapacity)?;
 
         let size = self.messages[index].set(message)?;
+
+        if *<Message as tx::Entry>::payload(&self.messages[index])
+            .last()
+            .unwrap()
+            < RAND.with(|v| *v)
+        {
+            return Ok(tx::Outcome { len: size, index });
+        }
+
         self.advance(1);
 
         // if we support GSO then mark the message as GSO-capable

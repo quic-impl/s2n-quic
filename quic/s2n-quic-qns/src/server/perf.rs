@@ -182,6 +182,11 @@ impl Perf {
         let subscriber = perf::Subscriber::default();
         subscriber.spawn(core::time::Duration::from_secs(1));
 
+        let subscriber = (
+            subscriber,
+            s2n_quic::provider::event::tracing::Subscriber::default(),
+        );
+
         let server = Server::builder()
             .with_limits(self.limits.limits())?
             .with_io(io)?

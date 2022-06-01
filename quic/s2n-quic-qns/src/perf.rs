@@ -236,9 +236,6 @@ impl s2n_quic::provider::event::Subscriber for Subscriber {
         _meta: &event::events::EndpointMeta,
         event: &event::events::PlatformEventLoopSleep,
     ) {
-        if event.timeout.unwrap_or_default() >= Duration::from_secs(15) {
-            panic!();
-        }
         self.counters.timeout.store(
             event.timeout.unwrap_or_default().as_nanos() as _,
             Ordering::Relaxed,
@@ -279,7 +276,7 @@ impl Counters {
         let duration = self.timeout.swap(0, Ordering::Relaxed);
         let duration = Duration::from_nanos(duration);
         let pto_count = self.pto_count.swap(0, Ordering::Relaxed);
-        println!(
+        eprintln!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{:?}\t{:?}\t{:?}\t{}",
             send_rate,
             receive_rate,
