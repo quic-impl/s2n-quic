@@ -31,9 +31,6 @@ lazy_static! {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         super::x86::testing::implementations(&mut impls);
 
-        #[cfg(any(test, feature = "ghash"))]
-        rust_crypto::implementations(&mut impls);
-
         impls
     };
 }
@@ -41,6 +38,3 @@ lazy_static! {
 pub fn implementations() -> &'static [Implementation] {
     &*IMPLEMENTATIONS
 }
-
-#[cfg(any(test, feature = "ghash"))]
-mod rust_crypto;

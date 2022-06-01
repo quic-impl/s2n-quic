@@ -34,9 +34,6 @@ macro_rules! aesgcm_impl {
 
                     crate::aesgcm::ring::$name::implementations(&mut impls);
 
-                    #[cfg(any(test, feature = "aes-gcm"))]
-                    super::rust_crypto::$name::implementations(&mut impls);
-
                     impls
                 };
             }
@@ -56,6 +53,3 @@ pub use crate::{
     aesgcm::{NONCE_LEN, TAG_LEN},
 };
 pub type Key = Box<dyn Aead<Nonce = [u8; NONCE_LEN], Tag = [u8; TAG_LEN]>>;
-
-#[cfg(any(test, feature = "aes-gcm"))]
-mod rust_crypto;
